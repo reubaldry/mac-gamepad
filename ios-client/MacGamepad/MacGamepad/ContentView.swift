@@ -10,19 +10,20 @@ import SwiftUI
 struct ContentView: View {
     @State private var manager = GamepadController()
     
-    // 1. The failsafe states. These guarantee they return to 'false' if the OS drops the touch.
-    @GestureState private var isAiming = false
+    @GestureState private var isLooking = false
     @GestureState private var isFiring = false
     
     @State private var aimDragTranslation: CGSize = .zero
     @State private var fireDragTranslation: CGSize = .zero
+    
+    @State private var aimState = false
     
     var body: some View {
         ZStack {
             // Background layer
             Color.black.edgesIgnoringSafeArea(.all)
             
-            // --- 1. THE AIM-ONLY TRACKPAD (Background) ---
+            // THE AIM-ONLY TRACKPAD (Background) ---
             HStack(spacing: 0) {
                 Color.clear
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -32,7 +33,7 @@ struct ContentView: View {
                     .allowsHitTesting(manager.isConnected)
                     .gesture(
                         DragGesture(minimumDistance: 0)
-                            .updating($isAiming) { _, state, _ in state = true }
+                            .updating($isLooking) { _, state, _ in state = true }
                             .onChanged { value in
                                 let deltaX = value.translation.width - aimDragTranslation.width
                                 let deltaY = value.translation.height - aimDragTranslation.height
@@ -45,7 +46,7 @@ struct ContentView: View {
                             }
                     )
                     // The Failsafe Cleanup
-                    .onChange(of: isAiming) { oldValue, newValue in
+                    .onChange(of: isLooking) { oldValue, newValue in
                         if !newValue {
                             aimDragTranslation = .zero
                             manager.updateMouse(deltaX: 0, deltaY: 0)
@@ -53,16 +54,21 @@ struct ContentView: View {
                     }
             }
             
-            // --- 2. THE FIRE + AIM BUTTON (Foreground) ---
+            // Fire button
             if manager.isConnected {
                 HStack {
                     Spacer()
+                    
+                    GameButton(label: "B", isToggle: true) {
+                        pressed in manager.setButtonState(.buttonB, isPressed: pressed)
+                    }.position(x: 700, y: 150)
                     
                     Circle()
                         .fill(Color.red.opacity(0.5))
                         .frame(width: 80, height: 80)
                         .padding(.trailing, 60)
                         .padding(.bottom, 60)
+                        .position(x: 300, y: 300)
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .updating($isFiring) { _, state, _ in state = true }
@@ -91,7 +97,7 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
             
-            // --- 3. CONNECT BUTTON ---
+            // CONNECT BUTTON ---
             VStack {
                 Button(manager.isConnected ? "Disconnect" : "Connect Gamepad") {
                     manager.toggleConnection()

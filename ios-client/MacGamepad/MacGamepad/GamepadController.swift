@@ -19,6 +19,7 @@ struct GamepadButtons: OptionSet {
     static let buttonY = GamepadButtons(rawValue: 1 << 3) // 0000 1000
     static let bumperL = GamepadButtons(rawValue: 1 << 4) // 0001 0000
     static let bumperR = GamepadButtons(rawValue: 1 << 5) // 0010 0000
+    static let disconnected = GamepadButtons(rawValue: 1 << 15) // 0100 0000
 }
 
 @Observable
@@ -49,10 +50,13 @@ class GamepadController {
     
     func toggleConnection() {
         if isConnected {
+            setButtonState(.disconnected, isPressed: true)
+            tick()
             virtualController?.disconnect()
             stopTickLoop()
             isConnected = false
         } else {
+            setButtonState(.disconnected, isPressed: false)
             let config = GCVirtualController.Configuration()
             config.elements = [GCInputLeftThumbstick]
             
