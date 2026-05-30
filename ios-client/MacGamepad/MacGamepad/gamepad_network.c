@@ -7,20 +7,6 @@
 
 #include "gamepad_network.h"
 
-int init_gamepad_socket(const char *ip_address, int port) {
-    struct sockaddr_in peer_addr = {
-        .sin_family = AF_INET,
-        .sin_port = htons(port)
-    };
-    
-    if (inet_pton(AF_INET, ip_address, &(peer_addr.sin_addr)) <= 0) {
-        perror("IP failure");
-        return EXIT_FAILURE;
-    }
-    
-    return EXIT_SUCCESS;
-}
-
 int send_controller_state(int8_t joystick_x, int8_t joystick_y, int8_t mouse_x, int8_t mouse_y, uint16_t button) {
     int sockfd;
     
@@ -66,7 +52,7 @@ int send_controller_state(int8_t joystick_x, int8_t joystick_y, int8_t mouse_x, 
     
     freeaddrinfo(servinfo);
     
-    printf("talker: sent %d bytes to %s\n", numbytes, SERVERIP);
+    printf("Client: sent %d bytes to %s\n", numbytes, SERVERIP);
     
     return EXIT_SUCCESS;
 }
