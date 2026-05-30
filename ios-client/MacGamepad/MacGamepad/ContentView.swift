@@ -9,6 +9,11 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var manager = GamepadController()
+    
+    // 1. The failsafe states. These guarantee they return to 'false' if the OS drops the touch.
+    @GestureState private var isAiming = false
+    @GestureState private var isFiring = false
+    
     @State private var aimDragTranslation: CGSize = .zero
     @State private var fireDragTranslation: CGSize = .zero
     
@@ -27,44 +32,66 @@ struct ContentView: View {
                     .allowsHitTesting(manager.isConnected)
                     .gesture(
                         DragGesture(minimumDistance: 0)
+                            .updating($isAiming) { _, state, _ in state = true }
                             .onChanged { value in
-                                processMovement(value: value, lastTranslation: &aimDragTranslation, isFiring: false)
-                            }
-                            .onEnded { _ in
-                                aimDragTranslation = .zero
-                                manager.updateMouse(deltaX: 0, deltaY: 0, trackpadPressed: false)
+                                let deltaX = value.translation.width - aimDragTranslation.width
+                                let deltaY = value.translation.height - aimDragTranslation.height
+                                aimDragTranslation = value.translation
+                                
+                                manager.updateMouse(
+                                    deltaX: Int8(max(min(deltaX, 127), -128)),
+                                    deltaY: Int8(max(min(deltaY, 127), -128))
+                                )
                             }
                     )
+                    // The Failsafe Cleanup
+                    .onChange(of: isAiming) { oldValue, newValue in
+                        if !newValue {
+                            aimDragTranslation = .zero
+                            manager.updateMouse(deltaX: 0, deltaY: 0)
+                        }
+                    }
             }
             
-            // --- 2. THE UI BUTTON LAYER (Foreground) ---
+            // --- 2. THE FIRE + AIM BUTTON (Foreground) ---
             if manager.isConnected {
                 HStack {
-                    Spacer() // Push to the right
+                    Spacer()
                     
-                    // The "Fire + Aim" Button
                     Circle()
-                        .fill(Color.red.opacity(0.5)) // Semi-transparent so you can see behind it
+                        .fill(Color.red.opacity(0.5))
                         .frame(width: 80, height: 80)
                         .padding(.trailing, 60)
                         .padding(.bottom, 60)
                         .gesture(
                             DragGesture(minimumDistance: 0)
+                                .updating($isFiring) { _, state, _ in state = true }
                                 .onChanged { value in
-                                    // Pass true for isFiring
-                                    processMovement(value: value, lastTranslation: &fireDragTranslation, isFiring: true)
-                                }
-                                .onEnded { _ in
-                                    fireDragTranslation = .zero
-                                    manager.updateMouse(deltaX: 0, deltaY: 0, trackpadPressed: false)
+                                    let deltaX = value.translation.width - fireDragTranslation.width
+                                    let deltaY = value.translation.height - fireDragTranslation.height
+                                    fireDragTranslation = value.translation
+                                    
+                                    // Turn the button on, and push the mouse coordinates
+                                    manager.setButtonState(.buttonA, isPressed: true)
+                                    manager.updateMouse(
+                                        deltaX: Int8(max(min(deltaX, 127), -128)),
+                                        deltaY: Int8(max(min(deltaY, 127), -128))
+                                    )
                                 }
                         )
+                        // The Failsafe Cleanup
+                        .onChange(of: isFiring) { oldValue, newValue in
+                            if !newValue {
+                                fireDragTranslation = .zero
+                                manager.updateMouse(deltaX: 0, deltaY: 0)
+                                manager.setButtonState(.buttonA, isPressed: false)
+                            }
+                        }
                 }
-                // Align this layer to the bottom right corner
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
             
-            // UI layer
+            // --- 3. CONNECT BUTTON ---
             VStack {
                 Button(manager.isConnected ? "Disconnect" : "Connect Gamepad") {
                     manager.toggleConnection()
@@ -74,25 +101,6 @@ struct ContentView: View {
                 .controlSize(.large)
             }
         }
-    }
-    
-    // Processes math for mouse movement
-    private func processMovement(value: DragGesture.Value, lastTranslation: inout CGSize, isFiring: Bool) {
-        let deltaX = value.translation.width - lastTranslation.width
-        let deltaY = value.translation.height - lastTranslation.height
-        
-        lastTranslation = value.translation
-        
-        let clampedX = Int8(max(min(deltaX, 127), -128))
-        let clampedY = Int8(max(min(deltaY, 127), -128))
-            
-        if isFiring {
-            manager.activeButtons.insert(.buttonA)
-        } else {
-            manager.activeButtons.remove(.buttonA)
-        }
-        
-        manager.updateMouse(deltaX: clampedX, deltaY: clampedY)
     }
 }
 
